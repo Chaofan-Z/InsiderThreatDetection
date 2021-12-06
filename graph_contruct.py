@@ -153,12 +153,13 @@ def split_node_by_day(sorted_vertex_list, day_delta):
     return daily_sequences_list
 
 def construct_activity_graph():
+    # 无向图，允许自循环，允许平行边
     activity_graph = nx.MultiGraph()
 
     # 一个用户同天同一个host时序连接
-    activity_graph = rule_1(activity_graph, daily_sequences_list, day_delta)
+    activity_graph, host_activity = rule_1(activity_graph, daily_sequences_list, day_delta)
     # 一个用户多天同一个host的行为链的时序关联
-    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta)
+    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, host_activity)
     # 一个用户多天同一个host同种组操作类型时序关联
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
     activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta)
@@ -186,10 +187,6 @@ if __name__ == '__main__':
 
     day_delta = get_days_from_dataset(sorted_vertex_list)
     daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta)
-
-    # daily_sequences_list = rule_1(daily_sequences_list)
-    # daily_sequences_list, H_tuple_list, A_tuple_list = rule_23(daily_sequences_list, day_delta)
-    # graph = rule_456(daily_sequences_list, H_tuple_list, A_tuple_list, day_delta)
 
     activity_graph = construct_activity_graph()
     company_graph = construct_company_graph()
