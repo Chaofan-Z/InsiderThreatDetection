@@ -164,6 +164,15 @@ def construct_activity_graph():
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
     activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta)
 
+    host = 'PC-5335'
+    for day_activity in host_activity:
+        print("Day : ", host_activity.index(day_activity))
+        if not day_activity or host not in day_activity:
+            continue
+        for node_id in day_activity[host]:
+            # print(host)
+            print(activity_graph.nodes[node_id]['H'], activity_graph.nodes[node_id]['A'])
+ 
     return activity_graph
 
 def construct_company_graph():
