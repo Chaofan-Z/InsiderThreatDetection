@@ -7,6 +7,9 @@ import os
 from tqdm import tqdm
 import datetime
 from construct_rule import *
+from graph_emb import DeepWalk
+from sklearn.cluster import DBSCAN
+import pdb
 
 def get_node_from_data(dir_path):
     print("Get node from data : ")
@@ -56,6 +59,7 @@ def get_node_from_data(dir_path):
                         'H': i[3], # pc,
                         'time': i[1]
                     }
+            # pdb.set_trace()
             vertex_list.append(vertex)
 
     with open(os.path.join(dir_path, "http.csv"), 'r') as file:
@@ -150,18 +154,19 @@ def split_node_by_day(sorted_vertex_list, day_delta):
         daily_sequences_list[day_of_vertex].add_node(vertex['vertex_number'], type=vertex['vertex_type'],
                                                             sub=vertex['sub'], obj=vertex['obj'], A=vertex['A'],
                                                             T=vertex['T'], H=vertex['H'])
+    print('daily_sequences_list: \n', daily_sequences_list)
     return daily_sequences_list
 
 def construct_activity_graph():
     activity_graph = nx.MultiGraph()
 
     # 一个用户同天同一个host时序连接
-    activity_graph = rule_1(activity_graph, daily_sequences_list, day_delta)
+    activity_graph, H_tuple_list = rule_1(activity_graph, daily_sequences_list, day_delta)
     # 一个用户多天同一个host的行为链的时序关联
-    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta)
+    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, H_tuple_list)
     # 一个用户多天同一个host同种组操作类型时序关联
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
-    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta)
+    activity_graph, A_tuple_list = rule_3(activity_graph, daily_sequences_list, day_delta, H_tuple_list)
 
     return activity_graph
 
@@ -188,6 +193,7 @@ if __name__ == '__main__':
     daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta)
 
     # daily_sequences_list = rule_1(daily_sequences_list)
+    # pdb.set_trace()
     # daily_sequences_list, H_tuple_list, A_tuple_list = rule_23(daily_sequences_list, day_delta)
     # graph = rule_456(daily_sequences_list, H_tuple_list, A_tuple_list, day_delta)
 
@@ -198,5 +204,25 @@ if __name__ == '__main__':
     nx.write_edgelist(activity_graph, "./our_data/activity_graph_edge")
     nx.write_gpickle(activity_graph, "./our_data/activity_graph.gpickle")
 
+    G = nx.read_gpickle("./our_data/activity_graph.gpickle")
+
+    # 序列长度，xxx，并行worker数量
+    model = DeepWalk(G, walk_length=10, num_walks=80, workers=1)
+    model.train(window_size=5, iter=3)
+    embeddings = model.get_embeddings()
+
     print("Graph save done")
-    print("Time cost : ", time.time() - st_time) 
+    print("Time cost : ", time.time() - st_time)
+
+    train_X = []
+    train_X_id = []
+    pdb.set_trace()
+    for k, v in embeddings.items():
+        print('key: ', k, 'value: ', v)
+        train_X.append(v)
+        train_X_id.append(k)
+
+    train_X = np.array(train_X)
+    clustering = DBSCAN().fit(train_X)
+
+    print('ok')
