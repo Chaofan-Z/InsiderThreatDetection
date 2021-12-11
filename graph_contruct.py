@@ -23,7 +23,7 @@ def get_node_from_data(dir_path):
             vertex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
             
-            vertex = { 'vertex_type': 'logon',
+            vertex = { 'vertex_type': 'activity_logon',
                         'vertex_number': vertex_id,
                         'sub': i[2],
                         'obj': i[3],
@@ -47,7 +47,7 @@ def get_node_from_data(dir_path):
             vertex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
             
-            vertex = { 'vertex_type': 'file',
+            vertex = { 'vertex_type': 'activity_file',
                         'vertex_number': vertex_id,
                         'sub': i[2], # user
                         'obj': i[4], # filename
@@ -68,7 +68,7 @@ def get_node_from_data(dir_path):
         for i in tqdm(read):
             vectex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
-            vertex = { 'vertex_type': 'http',
+            vertex = { 'vertex_type': 'activity_http',
                         'vertex_number': vertex_id,
                         'sub': i[2], # user
                         'obj': i[4].split(' ')[0], # url
@@ -91,7 +91,7 @@ def get_node_from_data(dir_path):
         for i in tqdm(read):
             vectex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
-            vertex = { 'vertex_type': 'device',
+            vertex = { 'vertex_type': 'activity_device',
                         'vertex_number': vertex_id,
                         'sub': i[2], # user
                         'obj': i[3], # host
@@ -162,25 +162,28 @@ def construct_activity_graph():
     activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, host_activity)
     # 一个用户多天同一个host同种组操作类型时序关联
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
-    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta)
+    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta, host_activity)
 
-    host = 'PC-5335'
-    for day_activity in host_activity:
-        print("Day : ", host_activity.index(day_activity))
-        if not day_activity or host not in day_activity:
-            continue
-        for node_id in day_activity[host]:
-            # print(host)
-            print(activity_graph.nodes[node_id]['H'], activity_graph.nodes[node_id]['A'])
+    # test code 
+    # host = 'PC-5335'
+    # for day_activity in host_activity:
+    #     print("Day : ", host_activity.index(day_activity))
+    #     if not day_activity or host not in day_activity:
+    #         continue
+    #     for node_id in day_activity[host]:
+    #         # print(host)
+    #         print(activity_graph.nodes[node_id]['H'], activity_graph.nodes[node_id]['A'])
  
     return activity_graph
 
+# Todo
 def construct_company_graph():
     pass
 
+# Todo
 def construct_object_graph():
     pass
-
+ 
 # Todo : 
 # 1. construct_activity_graph
 # 2. construct_company_graph
