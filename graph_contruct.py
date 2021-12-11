@@ -207,7 +207,7 @@ if __name__ == '__main__':
     G = nx.read_gpickle("./our_data/activity_graph.gpickle")
 
     # 序列长度，xxx，并行worker数量
-    model = DeepWalk(G, walk_length=10, num_walks=80, workers=1, edge_type = 1)
+    model = DeepWalk(G, walk_length=10, num_walks=80, workers=1, edge_type = [1])
     model.train(window_size=5, iter=3)
     embeddings = model.get_embeddings()
 

@@ -14,7 +14,7 @@ import pdb
 def get_neighbors_edgeType(G, cur, edge_type):
     res = []
     for nbr in G.neighbors(cur):
-        if G[cur][nbr].get('EdgeType') == edge_type:
+        if G[cur][nbr].get('EdgeType') in edge_type:
             res.append(nbr)
     return res
 
@@ -33,7 +33,7 @@ class RandomWalker:
         self.q = q
         self.use_rejection_sampling = use_rejection_sampling
 
-    def deepwalk_walk(self, walk_length, start_node, edge_type = 1):
+    def deepwalk_walk(self, walk_length, start_node, edge_type = [1]):
 
         walk = [start_node]
         pdb.set_trace()
@@ -47,7 +47,7 @@ class RandomWalker:
                 break
         return walk
 
-    def node2vec_walk(self, walk_length, start_node, edge_type = 1):
+    def node2vec_walk(self, walk_length, start_node, edge_type = [1]):
 
         G = self.G
         alias_nodes = self.alias_nodes
@@ -74,7 +74,7 @@ class RandomWalker:
 
         return walk
 
-    def node2vec_walk2(self, walk_length, start_node, edge_type = 1):
+    def node2vec_walk2(self, walk_length, start_node, edge_type = [1]):
         """
         Reference:
         KnightKing: A Fast Distributed Graph Random Walk Engine
@@ -109,7 +109,7 @@ class RandomWalker:
                         inv_p, inv_q, len(cur_nbrs))
                     prev = walk[-2]
                     # prev_nbrs = set(G.neighbors(prev))
-                    prev = get_neighbors_edgeType(self.G, edge_type)
+                    prev_nbrs = get_neighbors_edgeType(self.G, edge_type)
                     while True:
                         prob = random.random() * upper_bound
                         if (prob + shatter >= upper_bound):

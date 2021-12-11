@@ -24,7 +24,7 @@ import pdb
 
 
 class DeepWalk:
-    def __init__(self, graph, walk_length, num_walks, workers=1, edge_type = 1):
+    def __init__(self, graph, walk_length, num_walks, workers=1, edge_type = [1]):
 
         self.graph = graph
         self.w2v_model = None
