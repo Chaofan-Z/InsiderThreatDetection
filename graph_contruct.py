@@ -207,7 +207,7 @@ if __name__ == '__main__':
     G = nx.read_gpickle("./our_data/activity_graph.gpickle")
 
     # 序列长度，xxx，并行worker数量
-    model = DeepWalk(G, walk_length=10, num_walks=80, workers=1)
+    model = DeepWalk(G, walk_length=10, num_walks=80, workers=1, edge_type = 1)
     model.train(window_size=5, iter=3)
     embeddings = model.get_embeddings()
 
@@ -216,13 +216,18 @@ if __name__ == '__main__':
 
     train_X = []
     train_X_id = []
-    pdb.set_trace()
+    # pdb.set_trace()
     for k, v in embeddings.items():
-        print('key: ', k, 'value: ', v)
+        # print('key: ', k, 'value: ', v)
         train_X.append(v)
         train_X_id.append(k)
 
-    train_X = np.array(train_X)
-    clustering = DBSCAN().fit(train_X)
 
+
+    train_X = np.array(train_X)
+
+    clustering = DBSCAN().fit(train_X)
+    cluster = DBSCAN.fit_predict(train_X)
+    print('test')
     print('ok')
+    # pdb.set_trace()

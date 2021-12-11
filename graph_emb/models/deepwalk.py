@@ -24,7 +24,7 @@ import pdb
 
 
 class DeepWalk:
-    def __init__(self, graph, walk_length, num_walks, workers=1):
+    def __init__(self, graph, walk_length, num_walks, workers=1, edge_type = 1):
 
         self.graph = graph
         self.w2v_model = None
@@ -32,7 +32,7 @@ class DeepWalk:
 
         # 随机游走, 1/p 是不进行游走的概率，1/q是访问距离为2的节点的概率，邻接访问概率为1
         self.walker = RandomWalker(graph, p=100, q=1, )
-        self.walker.preprocess_transition_probs()
+        self.walker.preprocess_transition_probs(edge_type)
 
         self.sentences = self.walker.simulate_walks(
             num_walks=num_walks, walk_length=walk_length, workers=workers, verbose=1)

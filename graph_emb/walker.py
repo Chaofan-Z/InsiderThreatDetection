@@ -9,6 +9,15 @@ from tqdm import trange
 
 from .alias import alias_sample, create_alias_table
 from .utils import partition_num
+import pdb
+
+def get_neighbors_edgeType(G, cur, edge_type):
+    res = []
+    for nbr in G.neighbors(cur):
+        if G[cur][nbr].get('EdgeType') == edge_type:
+            res.append(nbr)
+    return res
+
 
 
 class RandomWalker:
@@ -24,20 +33,21 @@ class RandomWalker:
         self.q = q
         self.use_rejection_sampling = use_rejection_sampling
 
-    def deepwalk_walk(self, walk_length, start_node):
+    def deepwalk_walk(self, walk_length, start_node, edge_type = 1):
 
         walk = [start_node]
-
+        pdb.set_trace()
         while len(walk) < walk_length:
             cur = walk[-1]
-            cur_nbrs = list(self.G.neighbors(cur))
+            # cur_nbrs = list(self.G.neighbors(cur))
+            cur_nbrs = get_neighbors_edgeType(self.G, edge_type)
             if len(cur_nbrs) > 0:
                 walk.append(random.choice(cur_nbrs))
             else:
                 break
         return walk
 
-    def node2vec_walk(self, walk_length, start_node):
+    def node2vec_walk(self, walk_length, start_node, edge_type = 1):
 
         G = self.G
         alias_nodes = self.alias_nodes
@@ -47,7 +57,8 @@ class RandomWalker:
 
         while len(walk) < walk_length:
             cur = walk[-1]
-            cur_nbrs = list(G.neighbors(cur))
+            # cur_nbrs = list(G.neighbors(cur))
+            cur_nbrs = get_neighbors_edgeType(self.G, cur, edge_type)
             if len(cur_nbrs) > 0:
                 if len(walk) == 1:
                     walk.append(
@@ -63,7 +74,7 @@ class RandomWalker:
 
         return walk
 
-    def node2vec_walk2(self, walk_length, start_node):
+    def node2vec_walk2(self, walk_length, start_node, edge_type = 1):
         """
         Reference:
         KnightKing: A Fast Distributed Graph Random Walk Engine
@@ -87,7 +98,8 @@ class RandomWalker:
         walk = [start_node]
         while len(walk) < walk_length:
             cur = walk[-1]
-            cur_nbrs = list(G.neighbors(cur))
+            # cur_nbrs = list(G.neighbors(cur))
+            cur_nbrs = get_neighbors_edgeType(self.G, edge_type)
             if len(cur_nbrs) > 0:
                 if len(walk) == 1:
                     walk.append(
@@ -96,7 +108,8 @@ class RandomWalker:
                     upper_bound, lower_bound, shatter = rejection_sample(
                         inv_p, inv_q, len(cur_nbrs))
                     prev = walk[-2]
-                    prev_nbrs = set(G.neighbors(prev))
+                    # prev_nbrs = set(G.neighbors(prev))
+                    prev = get_neighbors_edgeType(self.G, edge_type)
                     while True:
                         prob = random.random() * upper_bound
                         if (prob + shatter >= upper_bound):
@@ -146,7 +159,7 @@ class RandomWalker:
                         walk_length=walk_length, start_node=v))
         return walks
 
-    def get_alias_edge(self, t, v):
+    def get_alias_edge(self, t, v, edge_type):
         """
         compute unnormalized transition probability between nodes v and its neighbors give the previous visited node t.
         :param t:
@@ -158,7 +171,8 @@ class RandomWalker:
         q = self.q
 
         unnormalized_probs = []
-        for x in G.neighbors(v):
+        # for x in G.neighbors(v):
+        for x in get_neighbors_edgeType(self.G, v, edge_type):
             weight = G[v][x].get('weight', 1.0)  # w_vx
             if x == t:  # d_tx == 0
                 unnormalized_probs.append(weight/p)
@@ -172,15 +186,21 @@ class RandomWalker:
 
         return create_alias_table(normalized_probs)
 
-    def preprocess_transition_probs(self):
+    def preprocess_transition_probs(self, edge_type):
         """
         Preprocessing of transition probabilities for guiding the random walks.
         """
         G = self.G
         alias_nodes = {}
         for node in G.nodes():
+            # unnormalized_probs = [G[node][nbr].get('weight', 1.0)
+            #                       for nbr in G.neighbors(node)]
+            # unnormalized_probs = []
+            # for nbr in G.neighbors(node):
+            #     if G[node][nbr].get('EdgeType') == edge_type:
+            #         unnormalized_probs.append(G[node][nbr].get('weight', 1.0))
             unnormalized_probs = [G[node][nbr].get('weight', 1.0)
-                                  for nbr in G.neighbors(node)]
+                                  for nbr in get_neighbors_edgeType(self.G, node, edge_type)]
             norm_const = sum(unnormalized_probs)
             normalized_probs = [
                 float(u_prob)/norm_const for u_prob in unnormalized_probs]
@@ -190,9 +210,9 @@ class RandomWalker:
             alias_edges = {}
 
             for edge in G.edges():
-                alias_edges[edge] = self.get_alias_edge(edge[0], edge[1])
+                alias_edges[edge] = self.get_alias_edge(edge[0], edge[1], edge_type)
                 if not G.is_directed():
-                    alias_edges[(edge[1], edge[0])] = self.get_alias_edge(edge[1], edge[0])
+                    alias_edges[(edge[1], edge[0])] = self.get_alias_edge(edge[1], edge[0], edge_type)
                 self.alias_edges = alias_edges
 
         self.alias_nodes = alias_nodes
