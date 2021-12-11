@@ -1,4 +1,3 @@
-import numpy as np
 import networkx as nx
 import csv
 import matplotlib.pyplot as plt
@@ -105,8 +104,8 @@ def get_node_from_data(dir_path):
 
     sorted_vertex_list = sorted(vertex_list, key=lambda e: (e.__getitem__('sub'), e.__getitem__('T')))
 
-    print("sorted vertex list : ")
-    print(sorted_vertex_list[:1])
+    # print("sorted vertex list : ")
+    # print(sorted_vertex_list[:1])
 
     return sorted_vertex_list
 
@@ -126,7 +125,7 @@ def get_days_from_dataset(sorted_vertex_list):
     print("Data delta days : ", get_delta_days(end_time, st_time)) 
     return get_delta_days(end_time, st_time) + 2
 
-def split_node_by_day(sorted_vertex_list, day_delta):
+def split_node_by_day(sorted_vertex_list, day_delta, label):
     # 1000条数据大概4天
 
     st_time = 9999999999
@@ -145,12 +144,25 @@ def split_node_by_day(sorted_vertex_list, day_delta):
         # If the sequence graph not exists, create it
         if not daily_sequences_list[day_of_vertex]:
             # multiGraph 无向图 可以让两个节点之间有多个边，为啥要用这个graph..
-            daily_sequences_list[day_of_vertex] = nx.MultiGraph()
-        
+            daily_sequences_list[day_of_vertex] = nx.MultiGraph() 
+
+        vertex_label = 0
+        if vertex['vertex_number'] in label:
+            vertex_label = label[vertex['vertex_number']]
         daily_sequences_list[day_of_vertex].add_node(vertex['vertex_number'], type=vertex['vertex_type'],
                                                             sub=vertex['sub'], obj=vertex['obj'], A=vertex['A'],
-                                                            T=vertex['T'], H=vertex['H'])
+                                                            T=vertex['T'], H=vertex['H'], vertex_label=vertex_label)
     return daily_sequences_list
+
+def get_answer(answer_dir, version):
+    label_num = [i for i in range(1, 6)]
+    label = {}
+    for la in label_num:
+        with open(os.path.join(answer_dir, version) + '-' + str(la) + '.csv') as file:
+            for line in file:
+                line = line.strip().split(',')
+                label[line[1].strip("\"")] = la
+    return label
 
 def construct_activity_graph():
     # 无向图，允许自循环，允许平行边
@@ -195,15 +207,16 @@ if __name__ == '__main__':
     st_time = time.time()
 
     data_version = "r_part"
+    label = get_answer("./our_data/answers/", "r6.2")
     sorted_vertex_list = get_node_from_data(os.path.join("./our_data/", data_version))
-
     day_delta = get_days_from_dataset(sorted_vertex_list)
-    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta)
-
+    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta, label)
+    
     activity_graph = construct_activity_graph()
     company_graph = construct_company_graph()
     object_graph = construct_object_graph()
 
+    
     nx.write_edgelist(activity_graph, "./our_data/activity_graph_edge")
     nx.write_gpickle(activity_graph, "./our_data/activity_graph.gpickle")
 
