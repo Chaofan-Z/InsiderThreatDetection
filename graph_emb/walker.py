@@ -20,7 +20,6 @@ def get_neighbors_edgeType(G, cur, edge_type):
     return res
 
 
-
 class RandomWalker:
     def __init__(self, G, p=1, q=1, use_rejection_sampling=0):
         """
@@ -48,7 +47,7 @@ class RandomWalker:
                 break
         return walk
 
-    def node2vec_walk(self, walk_length, start_node, edge_type = [1]):
+    def node2vec_walk(self, walk_length, start_node, edge_type):
 
         G = self.G
         alias_nodes = self.alias_nodes
@@ -58,7 +57,6 @@ class RandomWalker:
 
         while len(walk) < walk_length:
             cur = walk[-1]
-            # cur_nbrs = list(G.neighbors(cur))
             cur_nbrs = get_neighbors_edgeType(self.G, cur, edge_type)
             if len(cur_nbrs) > 0:
                 if len(walk) == 1:
@@ -130,21 +128,21 @@ class RandomWalker:
                 break
         return walk
 
-    def simulate_walks(self, num_walks, walk_length, workers=1, verbose=0):
+    def simulate_walks(self, edge_type, num_walks, walk_length, workers=1, verbose=0):
 
         G = self.G
 
         nodes = list(G.nodes())
 
         results = Parallel(n_jobs=workers, verbose=verbose, )(
-            delayed(self._simulate_walks)(nodes, num, walk_length) for num in
+            delayed(self._simulate_walks)(nodes, num, walk_length, edge_type) for num in
             partition_num(num_walks, workers))
 
         walks = list(itertools.chain(*results))
 
         return walks
 
-    def _simulate_walks(self, nodes, num_walks, walk_length,):
+    def _simulate_walks(self, nodes, num_walks, walk_length, edge_type):
         walks = []
         for _ in range(num_walks):
             random.shuffle(nodes)
@@ -157,7 +155,7 @@ class RandomWalker:
                         walk_length=walk_length, start_node=v))
                 else:
                     walks.append(self.node2vec_walk(
-                        walk_length=walk_length, start_node=v))
+                        walk_length=walk_length, start_node=v, edge_type=edge_type))
         return walks
 
     def get_alias_edge(self, t, v, edge_type):
@@ -191,15 +189,18 @@ class RandomWalker:
         """
         Preprocessing of transition probabilities for guiding the random walks.
         """
+        print("edge type : ", edge_type)
         G = self.G
         alias_nodes = {}
         for node in G.nodes():
+
             # unnormalized_probs = [G[node][nbr].get('weight', 1.0)
             #                       for nbr in G.neighbors(node)]
             # unnormalized_probs = []
             # for nbr in G.neighbors(node):
             #     if G[node][nbr].get('EdgeType') == edge_type:
             #         unnormalized_probs.append(G[node][nbr].get('weight', 1.0))
+
             unnormalized_probs = [G[node][nbr].get('weight', 1.0)
                                   for nbr in get_neighbors_edgeType(self.G, node, edge_type)]
             norm_const = sum(unnormalized_probs)

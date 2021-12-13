@@ -19,6 +19,7 @@ def timer(function):
 def rule_1(activity_graph, daily_sequences_list, day_delta):
     # host_activity : list{day -> map{host->activity_list}}
     rule1_num = 0
+    day_delta = len(daily_sequences_list)
     host_activity = [None] * day_delta
     for daily_sequence in tqdm(daily_sequences_list):
         h_tuple = {}
@@ -41,6 +42,7 @@ def rule_1(activity_graph, daily_sequences_list, day_delta):
 # 一个用户多天同一个host的行为链的时序关联
 @timer
 def rule_2(activity_graph, daily_sequences_list, day_delta, host_activity):
+    day_delta = len(daily_sequences_list)
     rule2_num = 0
     for daily_sequence in daily_sequences_list:
         if daily_sequence:

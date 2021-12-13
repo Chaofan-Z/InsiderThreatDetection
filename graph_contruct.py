@@ -57,11 +57,11 @@ def get_node_from_data(dir_path):
                     }
             vertex_list.append(vertex)
 
-    with open(os.path.join(dir_path, "http.csv"), 'r') as file:
+    with open(os.path.join(dir_path, "http_process.csv"), 'r') as file:
     # id,date,user,pc,url,content
     # {D8Q7-C0RU46YI-7391WHNI},01/02/2010 06:46:20,HMI1448,PC-9352,http://nymag.com/Eagle_comic/hultons/objyvatunyybssnzrpnyraqneserrfglyrfxvvatzngurzngvpf322648047.jsp,eleven 1963 greater literature shorbodolio funding beating treasury both curzon single mourning huq exact visit disobeyed whose not thinking candidates necessary newly elevated eight including head those attempts present had median binds sized replacement colonial databases moderately adaptable symmetrical well drug encourage william 1840 1940s progeny possible variety 1978 on 1987 abandoned
     # {N4G0-D6NC43RD-2373QXNK},01/02/2010 06:47:25,HMI1448,PC-9352,http://nymag.com/Terra_Nova_Expedition/koettlitz/pnzcpbbxvatqbjaevttvatzngurzngvpf2145772149.asp,victims successor land restrictions provided agreeing article capture varied requests or forces 26 social medieval turkic sole population written complex visit started social down association area maulana help monument sectarian along duck jointly change words began won injured moved contract david january publish bob ready except significant appointment led making taking english true part sense entitled mothers complete fresh departure heritage youth
-        print("...http.csv...")
+        print("...http_process.csv...")
         read = csv.reader(file)
         next(read)
         for i in tqdm(read):
@@ -125,7 +125,7 @@ def get_days_from_dataset(sorted_vertex_list):
     print("Data delta days : ", get_delta_days(end_time, st_time)) 
     return get_delta_days(end_time, st_time) + 2
 
-def split_node_by_day(sorted_vertex_list, day_delta, label):
+def split_node_by_day(sorted_vertex_list, day_delta):
     # 1000条数据大概4天
 
     st_time = 9999999999
@@ -146,12 +146,12 @@ def split_node_by_day(sorted_vertex_list, day_delta, label):
             # multiGraph 无向图 可以让两个节点之间有多个边，为啥要用这个graph..
             daily_sequences_list[day_of_vertex] = nx.MultiGraph() 
 
-        vertex_label = 0
-        if vertex['vertex_number'] in label:
-            vertex_label = label[vertex['vertex_number']]
+        # vertex_label = 0
+        # if vertex['vertex_number'] in label:
+            # vertex_label = label[vertex['vertex_number']]
         daily_sequences_list[day_of_vertex].add_node(vertex['vertex_number'], type=vertex['vertex_type'],
                                                             sub=vertex['sub'], obj=vertex['obj'], A=vertex['A'],
-                                                            T=vertex['T'], H=vertex['H'], vertex_label=vertex_label)
+                                                            T=vertex['T'], H=vertex['H'])
     return daily_sequences_list
 
 def get_answer(answer_dir, version):
@@ -206,19 +206,34 @@ if __name__ == '__main__':
 
     st_time = time.time()
 
-    data_version = "r_part"
-    label = get_answer("./our_data/answers/", "r6.2")
-    sorted_vertex_list = get_node_from_data(os.path.join("./our_data/", data_version))
+    # data_dir = "./our_data/"
+    # data_version = "r_part"
+
+    data_dir = "/mnt/188b5285-b188-4759-81ac-763ab8cbc6bf/InsiderThreatData/"
+    # data_version = "r6.2"
+    data_version = "r5.2"
+    # data_version = "r_part"
+    version = "1"
+
+    # label = get_answer(os.path.join(data_dir, "answers"), data_version)
+
+    sorted_vertex_list = get_node_from_data(os.path.join(data_dir, data_version))
     day_delta = get_days_from_dataset(sorted_vertex_list)
-    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta, label)
+    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta)
+
+    # 使用一半数据构建图
+    daily_sequences_list = daily_sequences_list[:len(daily_sequences_list)]
     
     activity_graph = construct_activity_graph()
     company_graph = construct_company_graph()
     object_graph = construct_object_graph()
 
-    
-    nx.write_edgelist(activity_graph, "./our_data/activity_graph_edge")
-    nx.write_gpickle(activity_graph, "./our_data/activity_graph.gpickle")
+    graph_save_path = os.path.join("./output", data_version, version, "graph")
+    if not os.path.exists(graph_save_path):
+        os.makedirs(graph_save_path)
+
+    nx.write_edgelist(activity_graph, graph_save_path + "/activity_graph_edge")
+    nx.write_gpickle(activity_graph, graph_save_path + "/activity_graph.gpickle")
 
     print("Graph save done")
     print("Time cost : ", time.time() - st_time) 

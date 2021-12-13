@@ -24,7 +24,7 @@ import pdb
 
 
 class DeepWalk:
-    def __init__(self, graph, walk_length, num_walks, workers=1, edge_type = [1]):
+    def __init__(self, graph, walk_length, num_walks, workers=1, edge_type_group=[[1], [1,2], [1,2,3]]):
 
         self.graph = graph
         self.w2v_model = None
@@ -32,14 +32,29 @@ class DeepWalk:
 
         # 随机游走, 1/p 是不进行游走的概率，1/q是访问距离为2的节点的概率，邻接访问概率为1
         self.walker = RandomWalker(graph, p=100, q=1, )
-        self.walker.preprocess_transition_probs(edge_type)
 
-        self.sentences = self.walker.simulate_walks(
-            num_walks=num_walks, walk_length=walk_length, workers=workers, verbose=1)
+        self.walker.preprocess_transition_probs(edge_type_group[0])
+        self.sentences1 = self.walker.simulate_walks(
+            num_walks=num_walks, walk_length=walk_length, workers=workers, verbose=1, edge_type=edge_type_group[0])
+        
+        self.walker.preprocess_transition_probs(edge_type_group[1])
+        self.sentences2 = self.walker.simulate_walks(
+            num_walks=num_walks, walk_length=walk_length, workers=workers, verbose=1, edge_type=edge_type_group[1])
+        
+        self.walker.preprocess_transition_probs(edge_type_group[2])
+        self.sentences3 = self.walker.simulate_walks(
+            num_walks=num_walks, walk_length=walk_length, workers=workers, verbose=1, edge_type=edge_type_group[2])
+        
+        # print(len(self.sentences1))
+        # print(self.sentences1[:2])
+        # print(len(self.sentences2))
+        # print(self.sentences2[:2])
+        # print(len(self.sentences3))
+        # print(self.sentences3[:2])
+        # print(len(self.sentences))
+        # print(self.sentences[0])
 
-        # print(self.sentences)
-        print(len(self.sentences))
-        print(self.sentences[0])
+        self.sentences = self.sentences1 + self.sentences2 + self.sentences3
 
     def train(self, embed_size=128, window_size=5, workers=3, iter=5, **kwargs):
 
