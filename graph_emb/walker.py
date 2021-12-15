@@ -5,6 +5,7 @@ import random
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from tqdm import tqdm
 from tqdm import trange
 
 from .alias import alias_sample, create_alias_table
@@ -31,12 +32,18 @@ class RandomWalker:
         self.G = G
         self.p = p
         self.q = q
+        self.nodes = []
+        for node in G.nodes():
+            if G.nodes[node]['A'] == 'Logon':
+                self.nodes.append(node)
+        print("=" * 20)
+        print("Graph start nodes : ", len(self.nodes))
         self.use_rejection_sampling = use_rejection_sampling
 
     def deepwalk_walk(self, walk_length, start_node, edge_type = [1]):
 
         walk = [start_node]
-        pdb.set_trace()
+        # pdb.set_trace()
         while len(walk) < walk_length:
             cur = walk[-1]
             # cur_nbrs = list(self.G.neighbors(cur))
@@ -54,7 +61,7 @@ class RandomWalker:
         alias_edges = self.alias_edges
 
         walk = [start_node]
-
+        has_higher_edge = False
         while len(walk) < walk_length:
             cur = walk[-1]
             cur_nbrs = get_neighbors_edgeType(self.G, cur, edge_type)
@@ -67,11 +74,14 @@ class RandomWalker:
                     edge = (prev, cur)
                     next_node = cur_nbrs[alias_sample(alias_edges[edge][0],
                                                       alias_edges[edge][1])]
+                    if has_higher_edge or G[prev][cur][0]['EdgeType'] == edge_type[-1]:
+                        has_higher_edge = True
+
                     walk.append(next_node)
             else:
                 break
 
-        return walk
+        return walk, has_higher_edge
 
     def node2vec_walk2(self, walk_length, start_node, edge_type = [1]):
         """
@@ -128,25 +138,28 @@ class RandomWalker:
                 break
         return walk
 
-    def simulate_walks(self, edge_type, num_walks, walk_length, workers=1, verbose=0):
+    def simulate_walks(self, edge_type, num_walks, walk_length, sentence_min_len, workers=1, verbose=0):
 
-        G = self.G
-
-        nodes = list(G.nodes())
+        # G = self.G
+        # nodes = []
+        # for node in G.nodes():
+        #     if G.nodes[node]['A'] == 'Logon':
+        #         nodes.append(node)
+        # nodes = list(G.nodes())
 
         results = Parallel(n_jobs=workers, verbose=verbose, )(
-            delayed(self._simulate_walks)(nodes, num, walk_length, edge_type) for num in
+            delayed(self._simulate_walks)(self.nodes, num, walk_length, edge_type, sentence_min_len) for num in
             partition_num(num_walks, workers))
 
         walks = list(itertools.chain(*results))
 
         return walks
 
-    def _simulate_walks(self, nodes, num_walks, walk_length, edge_type):
+    def _simulate_walks(self, nodes, num_walks, walk_length, edge_type, sentence_min_len):
         walks = []
         for _ in range(num_walks):
-            random.shuffle(nodes)
-            for v in nodes:
+            # random.shuffle(nodes)
+            for v in tqdm(nodes):
                 if self.p == 1 and self.q == 1:
                     walks.append(self.deepwalk_walk(
                         walk_length=walk_length, start_node=v))
@@ -154,8 +167,11 @@ class RandomWalker:
                     walks.append(self.node2vec_walk2(
                         walk_length=walk_length, start_node=v))
                 else:
-                    walks.append(self.node2vec_walk(
-                        walk_length=walk_length, start_node=v, edge_type=edge_type))
+                    walk, has_higher_edge = self.node2vec_walk(
+                        walk_length=walk_length, start_node=v, edge_type=edge_type)
+                    if len(walk) < sentence_min_len or not has_higher_edge:
+                        continue    
+                    walks.append(walk)
         return walks
 
     def get_alias_edge(self, t, v, edge_type):

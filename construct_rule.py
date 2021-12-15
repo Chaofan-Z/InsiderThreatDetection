@@ -2,6 +2,7 @@ import networkx as nx
 from tqdm import tqdm
 from itertools import chain
 import time
+import gc 
 
 def timer(function):
     def wrapper(*args, **kwargs):
@@ -18,6 +19,7 @@ def timer(function):
 @timer
 def rule_1(activity_graph, daily_sequences_list, day_delta):
     # host_activity : list{day -> map{host->activity_list}}
+    st = time.time()
     rule1_num = 0
     day_delta = len(daily_sequences_list)
     host_activity = [None] * day_delta
@@ -32,10 +34,13 @@ def rule_1(activity_graph, daily_sequences_list, day_delta):
                 else:
                     h_tuple[host].append(node_id)
                     rule1_num += 1
-                    daily_sequence.add_edge(h_tuple[host][-2], h_tuple[host][-1], EdgeType=1, weight=1)
+                    # daily_sequence.add_edge(h_tuple[host][-2], h_tuple[host][-1], EdgeType=1, weight=1)
+                    activity_graph.add_edge(h_tuple[host][-2], h_tuple[host][-1], EdgeType=1, weight=1)
             host_activity[daily_sequences_list.index(daily_sequence)] = h_tuple
+
+    ed = time.time()
+    print("time cost : ", ed - st)
     print("rule1 edge number : ", rule1_num)
-       
     # activity_graph 接口形式统一，并未用到该变量
     return activity_graph, host_activity
 
@@ -44,9 +49,9 @@ def rule_1(activity_graph, daily_sequences_list, day_delta):
 def rule_2(activity_graph, daily_sequences_list, day_delta, host_activity):
     day_delta = len(daily_sequences_list)
     rule2_num = 0
-    for daily_sequence in daily_sequences_list:
-        if daily_sequence:
-            activity_graph = nx.compose(activity_graph, daily_sequence)
+    # for daily_sequence in daily_sequences_list:
+    #     if daily_sequence:
+    #         activity_graph = nx.compose(activity_graph, daily_sequence)
     for day_i in range(day_delta):
         for day_j in range(day_i + 1, day_delta):
             if not (daily_sequences_list[day_i] and daily_sequences_list[day_j]) :
@@ -68,6 +73,10 @@ def rule_2(activity_graph, daily_sequences_list, day_delta, host_activity):
                     rule2_num += 2
                     activity_graph.add_edge(st_i, st_j, EdgeType=2, weight=weight)
                     activity_graph.add_edge(ed_i, ed_j, EdgeType=2, weight=weight)
+    
+    # del daily_sequences_list
+    # gc.collect()
+    
     print("rule2 edge number : ", rule2_num)
     return activity_graph
 
@@ -140,3 +149,63 @@ def rule_3(activity_graph, daily_sequences_list, day_delta, day_host_activity):
                             activity_graph.add_edge(node_i[0], node_j[0], EdgeType=3, weight=0.5)
     print("rule3 edge number : ", rule3_num)
     return activity_graph
+
+@timer
+def rule_3_1(activity_graph, daily_sequences_list, day_delta, H_tuple_list):
+    print('同一天同一主机相同操作类型 Rule3 Start!')
+
+    print('需要先构建同一天同一主机相同操作类型 Start!')
+
+    A_tuple_list = [None] * day_delta
+    for daily_sequence in daily_sequences_list:
+        if daily_sequence:
+            # key: H;    value: list of nodes number
+            day_of_seq = daily_sequences_list.index(daily_sequence)
+            H_record_tuple = H_tuple_list[day_of_seq]
+
+
+            A_record_tuple_tuple = {}
+            for key in H_record_tuple:
+                # Nodes in H_list have the same H
+                H_list = H_record_tuple[key]
+                A_record_tuple = {}
+                for node_i in H_list:
+                    current_A = daily_sequence.nodes[node_i]['A']
+                    if current_A not in A_record_tuple.keys():
+                        A_record_tuple[current_A] = [node_i]
+                    else:
+                        node_j = A_record_tuple[current_A][-1]
+                        # 这里的边是同一用户同一天同一主机同一种操作类型
+                        activity_graph.add_edge(node_j, node_i, EdgeType=3, weight=1)
+                        A_record_tuple[current_A].append(node_i)
+
+                A_record_tuple_tuple[key] = A_record_tuple
+
+            A_tuple_list[day_of_seq] = A_record_tuple_tuple
+
+    print('同一用户同一天同一主机同一种操作类型 End！')
+
+    print('同一用户不同天同一主机相同操作类型 Start!')
+    for i in range(0, day_delta):
+        # 不同天之间
+        for j in range(i + 1, day_delta):
+            if daily_sequences_list[i] and daily_sequences_list[j]:
+                # 同一台主机
+                for key in H_tuple_list[i]:
+                    if key in H_tuple_list[j].keys():
+                        # 相同操作类型
+                        for operation_type in A_tuple_list[i][key]:
+                            if operation_type in A_tuple_list[j][key]:
+                                u1 = A_tuple_list[i][key][operation_type][0]
+                                v1 = A_tuple_list[j][key][operation_type][0]
+                                u2 = A_tuple_list[i][key][operation_type][-1]
+                                v2 = A_tuple_list[j][key][operation_type][-1]
+                                len_u = len(A_tuple_list[i][key][operation_type])
+                                len_v = len(A_tuple_list[j][key][operation_type])
+                                weight_u_v = len_u / len_v if len_u < len_v else len_v / len_u
+                                w = round(weight_u_v, 3)
+                                activity_graph.add_edge(u1, v1, EdgeType=3, weight=w)
+                                activity_graph.add_edge(u2, v2, EdgeType=3, weight=w)
+    print('同一用户不同天同一主机相同操作类型 End!')
+    print("同一天同一主机相同操作类型 Rule3 End!")
+    return activity_graph, A_tuple_list
