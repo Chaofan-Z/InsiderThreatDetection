@@ -1,4 +1,3 @@
-import numpy as np
 import networkx as nx
 import csv
 import matplotlib.pyplot as plt
@@ -8,7 +7,7 @@ from tqdm import tqdm
 import datetime
 from construct_rule import *
 
-def get_node_from_data(dir_path):
+def get_node_from_data(dir_path, all_http=False):
     print("Get node from data : ")
     vertex_list = []
     with open(os.path.join(dir_path, "logon.csv"), 'r') as file:
@@ -23,7 +22,7 @@ def get_node_from_data(dir_path):
             vertex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
             
-            vertex = { 'vertex_type': 'logon',
+            vertex = { 'vertex_type': 'activity_logon',
                         'vertex_number': vertex_id,
                         'sub': i[2],
                         'obj': i[3],
@@ -47,7 +46,7 @@ def get_node_from_data(dir_path):
             vertex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
             
-            vertex = { 'vertex_type': 'file',
+            vertex = { 'vertex_type': 'activity_file',
                         'vertex_number': vertex_id,
                         'sub': i[2], # user
                         'obj': i[4], # filename
@@ -58,18 +57,23 @@ def get_node_from_data(dir_path):
                     }
             vertex_list.append(vertex)
 
-    with open(os.path.join(dir_path, "http.csv"), 'r') as file:
+    if all_http:
+        http_file = "http.csv"
+    else:
+        http_file = "http_process.csv"
+        
+    with open(os.path.join(dir_path, http_file), 'r') as file:
     # id,date,user,pc,url,content
     # {D8Q7-C0RU46YI-7391WHNI},01/02/2010 06:46:20,HMI1448,PC-9352,http://nymag.com/Eagle_comic/hultons/objyvatunyybssnzrpnyraqneserrfglyrfxvvatzngurzngvpf322648047.jsp,eleven 1963 greater literature shorbodolio funding beating treasury both curzon single mourning huq exact visit disobeyed whose not thinking candidates necessary newly elevated eight including head those attempts present had median binds sized replacement colonial databases moderately adaptable symmetrical well drug encourage william 1840 1940s progeny possible variety 1978 on 1987 abandoned
     # {N4G0-D6NC43RD-2373QXNK},01/02/2010 06:47:25,HMI1448,PC-9352,http://nymag.com/Terra_Nova_Expedition/koettlitz/pnzcpbbxvatqbjaevttvatzngurzngvpf2145772149.asp,victims successor land restrictions provided agreeing article capture varied requests or forces 26 social medieval turkic sole population written complex visit started social down association area maulana help monument sectarian along duck jointly change words began won injured moved contract david january publish bob ready except significant appointment led making taking english true part sense entitled mothers complete fresh departure heritage youth
-        print("...http.csv...")
+        print("...%s.csv..."%(http_file))
         read = csv.reader(file)
         next(read)
         for i in tqdm(read):
             vectex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
-            vertex = { 'vertex_type': 'http',
-                        'vertex_number': vertex_id,
+            vertex = { 'vertex_type': 'activity_http',
+                        'vertex_number': vectex_id,
                         'sub': i[2], # user
                         'obj': i[4].split(' ')[0], # url
                         'A': "visit", # activity
@@ -91,8 +95,8 @@ def get_node_from_data(dir_path):
         for i in tqdm(read):
             vectex_id = i[0]
             timestamp = time.mktime(time.strptime(i[1],'%m/%d/%Y %H:%M:%S'))
-            vertex = { 'vertex_type': 'device',
-                        'vertex_number': vertex_id,
+            vertex = { 'vertex_type': 'activity_device',
+                        'vertex_number': vectex_id,
                         'sub': i[2], # user
                         'obj': i[3], # host
                         'A': i[-1], # connect or disconnect
@@ -105,8 +109,8 @@ def get_node_from_data(dir_path):
 
     sorted_vertex_list = sorted(vertex_list, key=lambda e: (e.__getitem__('sub'), e.__getitem__('T')))
 
-    print("sorted vertex list : ")
-    print(sorted_vertex_list[:1])
+    # print("sorted vertex list : ")
+    # print(sorted_vertex_list[:1])
 
     return sorted_vertex_list
 
@@ -126,7 +130,7 @@ def get_days_from_dataset(sorted_vertex_list):
     print("Data delta days : ", get_delta_days(end_time, st_time)) 
     return get_delta_days(end_time, st_time) + 2
 
-def split_node_by_day(sorted_vertex_list, day_delta):
+def split_node_by_day(sorted_vertex_list, day_delta, activity_graph):
     # 1000条数据大概4天
 
     st_time = 9999999999
@@ -145,32 +149,51 @@ def split_node_by_day(sorted_vertex_list, day_delta):
         # If the sequence graph not exists, create it
         if not daily_sequences_list[day_of_vertex]:
             # multiGraph 无向图 可以让两个节点之间有多个边，为啥要用这个graph..
-            daily_sequences_list[day_of_vertex] = nx.MultiGraph()
-        
+            daily_sequences_list[day_of_vertex] = nx.MultiGraph() 
+
+        # vertex_label = 0
+        # if vertex['vertex_number'] in label:
+            # vertex_label = label[vertex['vertex_number']]
         daily_sequences_list[day_of_vertex].add_node(vertex['vertex_number'], type=vertex['vertex_type'],
+                                                            sub=vertex['sub'], obj=vertex['obj'], A=vertex['A'],
+                                                            T=vertex['T'], H=vertex['H'])
+        activity_graph.add_node(vertex['vertex_number'], type=vertex['vertex_type'],
                                                             sub=vertex['sub'], obj=vertex['obj'], A=vertex['A'],
                                                             T=vertex['T'], H=vertex['H'])
     return daily_sequences_list
 
 def construct_activity_graph():
+    # 无向图，允许自循环，允许平行边
     activity_graph = nx.MultiGraph()
 
     # 一个用户同天同一个host时序连接
-    activity_graph = rule_1(activity_graph, daily_sequences_list, day_delta)
+    activity_graph, host_activity = rule_1(activity_graph, daily_sequences_list, day_delta)
     # 一个用户多天同一个host的行为链的时序关联
-    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta)
+    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, host_activity)
     # 一个用户多天同一个host同种组操作类型时序关联
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
-    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta)
+    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta, host_activity)
 
+    # test code 
+    # host = 'PC-5335'
+    # for day_activity in host_activity:
+    #     print("Day : ", host_activity.index(day_activity))
+    #     if not day_activity or host not in day_activity:
+    #         continue
+    #     for node_id in day_activity[host]:
+    #         # print(host)
+    #         print(activity_graph.nodes[node_id]['H'], activity_graph.nodes[node_id]['A'])
+ 
     return activity_graph
 
+# Todo
 def construct_company_graph():
     pass
 
+# Todo
 def construct_object_graph():
     pass
-
+ 
 # Todo : 
 # 1. construct_activity_graph
 # 2. construct_company_graph
@@ -181,22 +204,47 @@ if __name__ == '__main__':
 
     st_time = time.time()
 
-    data_version = "r_part"
-    sorted_vertex_list = get_node_from_data(os.path.join("./our_data/", data_version))
+    # data_dir = "./our_data/"
+    # data_version = "r_part"
 
+    data_dir = "/mnt/188b5285-b188-4759-81ac-763ab8cbc6bf/InsiderThreatData/"
+    # data_version = "r6.2"
+    data_version = "r5.2"
+    version = "5"
+
+    # data_version = "r_part"
+    # version = "1"
+
+    # label = get_answer(os.path.join(data_dir, "answers"), data_version)
+
+    sorted_vertex_list = get_node_from_data(os.path.join(data_dir, data_version))
     day_delta = get_days_from_dataset(sorted_vertex_list)
-    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta)
 
-    # daily_sequences_list = rule_1(daily_sequences_list)
-    # daily_sequences_list, H_tuple_list, A_tuple_list = rule_23(daily_sequences_list, day_delta)
-    # graph = rule_456(daily_sequences_list, H_tuple_list, A_tuple_list, day_delta)
+    activity_graph = nx.MultiGraph()
+    daily_sequences_list = split_node_by_day(sorted_vertex_list, day_delta, activity_graph)
 
-    activity_graph = construct_activity_graph()
+    # 使用一半数据构建图
+    # daily_sequences_list = daily_sequences_list[:len(daily_sequences_list)]
+    # activity_graph = construct_activity_graph()
+
+    # 一个用户同天同一个host时序连接
+    activity_graph, host_activity = rule_1(activity_graph, daily_sequences_list, day_delta)
+    # 一个用户多天同一个host的行为链的时序关联
+    activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, host_activity)
+    # 一个用户多天同一个host同种组操作类型时序关联
+    # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
+    # activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta, host_activity)
+    # activity_graph = rule_3_1(activity_graph, daily_sequences_list, day_delta, host_activity)
+
     company_graph = construct_company_graph()
     object_graph = construct_object_graph()
+    print("Start save graph ")
+    graph_save_path = os.path.join("./output", data_version, version, "graph")
+    if not os.path.exists(graph_save_path):
+        os.makedirs(graph_save_path)
 
-    nx.write_edgelist(activity_graph, "./our_data/activity_graph_edge")
-    nx.write_gpickle(activity_graph, "./our_data/activity_graph.gpickle")
+    nx.write_edgelist(activity_graph, graph_save_path + "/activity_graph_edge")
+    nx.write_gpickle(activity_graph, graph_save_path + "/activity_graph.gpickle")
 
     print("Graph save done")
     print("Time cost : ", time.time() - st_time) 
