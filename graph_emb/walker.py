@@ -16,13 +16,13 @@ def get_neighbors_edgeType(G, cur, edge_type):
     res = []
     for nbr in G.neighbors(cur):
         # print(G[cur][nbr])
-        if G[cur][nbr][0].get('EdgeType') in edge_type:
+        if G[cur][nbr][0].get('EdgeType', 1) in edge_type:
             res.append(nbr)
     return res
 
 
 class RandomWalker:
-    def __init__(self, G, p=1, q=1, use_rejection_sampling=0):
+    def __init__(self, G, p=1, q=1, use_rejection_sampling=1):
         """
         :param G:
         :param p: Return parameter,controls the likelihood of immediately revisiting a node in the walk.
@@ -39,7 +39,6 @@ class RandomWalker:
         print("=" * 20)
         print("Graph start nodes : ", len(self.nodes))
         self.use_rejection_sampling = use_rejection_sampling
-
     def deepwalk_walk(self, walk_length, start_node, edge_type = [1]):
 
         walk = [start_node]
@@ -47,7 +46,7 @@ class RandomWalker:
         while len(walk) < walk_length:
             cur = walk[-1]
             # cur_nbrs = list(self.G.neighbors(cur))
-            cur_nbrs = get_neighbors_edgeType(self.G, edge_type)
+            cur_nbrs = get_neighbors_edgeType(self.G, cur, edge_type)
             if len(cur_nbrs) > 0:
                 walk.append(random.choice(cur_nbrs))
             else:
@@ -55,7 +54,7 @@ class RandomWalker:
         return walk
 
     def node2vec_walk(self, walk_length, start_node, edge_type):
-
+        # 
         G = self.G
         alias_nodes = self.alias_nodes
         alias_edges = self.alias_edges
@@ -102,15 +101,20 @@ class RandomWalker:
 
         G = self.G
         alias_nodes = self.alias_nodes
+        has_higher_edge = False
         inv_p = 1.0 / self.p
         inv_q = 1.0 / self.q
         walk = [start_node]
         while len(walk) < walk_length:
             cur = walk[-1]
             # cur_nbrs = list(G.neighbors(cur))
-            cur_nbrs = get_neighbors_edgeType(self.G, edge_type)
+            cur_nbrs = get_neighbors_edgeType(self.G, cur, edge_type)
             if len(cur_nbrs) > 0:
                 if len(walk) == 1:
+                    # if cur == "{L5K1-L1NL17VJ-9414WZTP}":
+                    #     print(cur)
+                    #     print(alias_nodes[cur])
+                    #     print(cur_nbrs)
                     walk.append(
                         cur_nbrs[alias_sample(alias_nodes[cur][0], alias_nodes[cur][1])])
                 else:
@@ -118,14 +122,13 @@ class RandomWalker:
                         inv_p, inv_q, len(cur_nbrs))
                     prev = walk[-2]
                     # prev_nbrs = set(G.neighbors(prev))
-                    prev_nbrs = get_neighbors_edgeType(self.G, edge_type)
+                    prev_nbrs = get_neighbors_edgeType(self.G, prev, edge_type)
                     while True:
                         prob = random.random() * upper_bound
                         if (prob + shatter >= upper_bound):
                             next_node = prev
                             break
-                        next_node = cur_nbrs[alias_sample(
-                            alias_nodes[cur][0], alias_nodes[cur][1])]
+                        next_node = cur_nbrs[alias_sample(alias_nodes[cur][0], alias_nodes[cur][1])]
                         if (prob < lower_bound):
                             break
                         if (prob < inv_p and next_node == prev):
@@ -133,10 +136,14 @@ class RandomWalker:
                         _prob = 1.0 if next_node in prev_nbrs else inv_q
                         if (prob < _prob):
                             break
+
+                    if has_higher_edge or G[cur][next_node][0]['EdgeType'] == edge_type[-1]:
+                        has_higher_edge = True
                     walk.append(next_node)
             else:
                 break
-        return walk
+
+        return walk, has_higher_edge
 
     def simulate_walks(self, edge_type, num_walks, walk_length, sentence_min_len, workers=1, verbose=0):
 
@@ -162,11 +169,18 @@ class RandomWalker:
             for v in tqdm(nodes):
                 if self.p == 1 and self.q == 1:
                     walks.append(self.deepwalk_walk(
-                        walk_length=walk_length, start_node=v))
+                        walk_length=walk_length, start_node=v, edge_type=edge_type))
+                # reject = 1后 进入这里
                 elif self.use_rejection_sampling:
-                    walks.append(self.node2vec_walk2(
-                        walk_length=walk_length, start_node=v))
+                    # print("-----------node2vec2222222-----------")
+                    walk, has_higher_edge = self.node2vec_walk2(walk_length=walk_length, start_node=v, edge_type=edge_type)
+
+                    if len(walk) < sentence_min_len or not has_higher_edge:
+                        continue 
+
+                    walks.append(walk)
                 else:
+                    # print("-----------node2vec-----------")
                     walk, has_higher_edge = self.node2vec_walk(
                         walk_length=walk_length, start_node=v, edge_type=edge_type)
                     if len(walk) < sentence_min_len or not has_higher_edge:
@@ -208,8 +222,10 @@ class RandomWalker:
         print("edge type : ", edge_type)
         G = self.G
         alias_nodes = {}
-        for node in G.nodes():
-
+        cnt = 1
+        node_len = len(G.nodes())
+        for node in tqdm(G.nodes()):
+            
             # unnormalized_probs = [G[node][nbr].get('weight', 1.0)
             #                       for nbr in G.neighbors(node)]
             # unnormalized_probs = []
@@ -217,16 +233,21 @@ class RandomWalker:
             #     if G[node][nbr].get('EdgeType') == edge_type:
             #         unnormalized_probs.append(G[node][nbr].get('weight', 1.0))
 
-            unnormalized_probs = [G[node][nbr].get('weight', 1.0)
+            unnormalized_probs = [G[node][nbr][0].get('weight', 1.0)
                                   for nbr in get_neighbors_edgeType(self.G, node, edge_type)]
+            # if node == "{L5K1-L1NL17VJ-9414WZTP}":
+            #     print("______-------amazing_________--------")
+            #     print(get_neighbors_edgeType(self.G, node, edge_type))
             norm_const = sum(unnormalized_probs)
             normalized_probs = [
                 float(u_prob)/norm_const for u_prob in unnormalized_probs]
             alias_nodes[node] = create_alias_table(normalized_probs)
 
+            cnt += 1
+        # use_rejection_sampling = 1的话 就不进入下面了
         if not self.use_rejection_sampling:
             alias_edges = {}
-
+            print("Use reject sample")
             for edge in G.edges():
                 alias_edges[edge] = self.get_alias_edge(edge[0], edge[1], edge_type)
                 if not G.is_directed():

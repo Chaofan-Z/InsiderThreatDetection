@@ -16,6 +16,9 @@ import torch
 from torch import nn
 import torch.utils.data as Data
 import pdb
+import datetime
+from tqdm import tqdm
+import pickle
 
 
 def get_centers_and_contexts(dataset, max_window_size):
@@ -107,16 +110,26 @@ def skip_gram(center, contexts_and_negatives, embed_v, embed_u):
 
 
 class word_embedding:
-    def __init__(self, raw_dataset, max_window_size, embed_size, num_epochs=10, batch_size=5, lr=0.01):
+    def __init__(self, raw_dataset, max_window_size, embed_size, graph, data_version, version, num_epochs=10, batch_size=5, lr=0.01):
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.graph_nodes = graph.nodes()
+
+        # print(graph)
+
+        self.all_model_dir = os.path.join("./output", data_version, version, "w2vmodel")
+        if not os.path.exists(self.all_model_dir):
+            os.makedirs(self.all_model_dir)
+        
+        self.data_version, self.version = data_version, version
+
         counter = collections.Counter([tk for st in raw_dataset for tk in st])
         counter = dict(counter.items())
-
         self.idx_to_token = [tk for tk, _ in counter.items()]
         self.token_to_idx = {tk: idx for idx, tk in enumerate(self.idx_to_token)}
-
         dataset = [[self.token_to_idx[tk] for tk in st if tk in self.token_to_idx]
                    for st in raw_dataset]
-
+        print("Data preprocess done..")
         self.max_window_size = max_window_size
         self.embed_size = embed_size
         self.num_epochs = num_epochs
@@ -156,9 +169,10 @@ class word_embedding:
         print("train on", device)
         net = self.net.to(device)
         optimizer = torch.optim.Adam(net.parameters(), lr=self.lr)
+        best_l_sum = 99999
         for epoch in range(self.num_epochs):
             start, l_sum, n = time.time(), 0.0, 0
-            for batch in self.data_iter:
+            for batch in tqdm(self.data_iter):
                 center, context_negative, mask, label = [d.to(device) for d in batch]
 
                 pred = skip_gram(center, context_negative, net[0], net[1])
@@ -171,9 +185,33 @@ class word_embedding:
                 optimizer.step()
                 l_sum += l.cpu().item()
                 n += 1
+
             print('epoch %d, loss %.2f, time %.2fs'
                   % (epoch + 1, l_sum / n, time.time() - start))
 
+            if best_l_sum > l_sum:
+                if epoch % 2 == 0:
+                    print("---Start to save Embedding ...")
+                    self._embeddings = {}
+                    st = time.time()
+                    for word in tqdm(self.graph_nodes):
+                        # pdb.set_trace()
+                        # self._embeddings[word] = self.w2v_model.wv[word]
+                        self._embeddings[word] = self.get_embeddings(word)
+                    with open(os.path.join("./output", self.data_version, self.version) + f"/embedding-{epoch}.pickle", 'wb') as file:
+                        pickle.dump(self._embeddings, file)
+                    print("---End to save Embedding ... cost : ", time.time() - st)
+
+                time_version = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                model_path = self.all_model_dir + f'/{time_version}-{self.data_version}-{self.version}-epoch{epoch}.models'
+                print("---Save model to ", model_path)
+                def dump_pickle(obj,file_path):
+                    pickle.dump(obj,open(file_path,'wb'),protocol=4)
+                dump_pickle(self.net, model_path)
+
     def get_embeddings(self, word):
-        idx = self.token_to_idx[word]
-        return self.net[0].weight[idx]
+        if word in self.token_to_idx:
+            idx = self.token_to_idx[word]
+            # print(self.net[0].weight[idx])
+            return self.net[0].weight[idx]
+        return torch.Tensor([0] * self.embed_size).to(self.device)

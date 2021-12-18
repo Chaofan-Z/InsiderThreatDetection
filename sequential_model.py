@@ -1,5 +1,6 @@
 from numpy.typing import _16Bit
 import torch
+import os
 from torch import nn
 from torch.nn import init
 
@@ -16,7 +17,7 @@ class Sequential_model(nn.Module):
         self.rnn1 = nn.LSTM(input_size, hidden_size, batch_first=batch_first, dropout=self.drop_out)
         self.rnn2 = nn.LSTM(hidden_size, hidden_size * 2, batch_first=batch_first, dropout=self.drop_out)
         self.ln1 = nn.Linear(hidden_size * 2 * seq_len, output_size)
-        self.softmax = nn.LogSoftmax(dim=output_size)
+        # self.softmax = nn.LogSoftmax(dim=output_size)
 
         # self.init_param()
 
@@ -25,11 +26,12 @@ class Sequential_model(nn.Module):
         output2, (hn2, cn2) = self.rnn2(output1)
         output2 = output2.reshape(output2.shape[0], -1)
         output = self.ln1(output2)
+        # output = self.softmax(output)
         return output
 
     # def init_parm(self):
     #     init.normal_()
-
+    
 
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

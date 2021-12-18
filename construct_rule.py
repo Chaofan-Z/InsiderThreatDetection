@@ -134,8 +134,9 @@ def rule_3(activity_graph, daily_sequences_list, day_delta, day_host_activity):
             host_day_activity[host].append(day_host_activity[i][host])
             host_day_activity_pattern[host].append(check_pattern(day_host_activity[i][host]))
 
+    print("-- start to construct edges --")
     # 同host下，不同天之间，同组操作类型的边关联
-    for host in host_day_activity_pattern:
+    for host in tqdm(host_day_activity_pattern):
         for day_i in range(len(host_day_activity_pattern[host])):
             for day_j in range(day_i + 1, len(host_day_activity_pattern[host])):
 
