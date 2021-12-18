@@ -233,7 +233,7 @@ if __name__ == '__main__':
     activity_graph = rule_2(activity_graph, daily_sequences_list, day_delta, host_activity)
     # 一个用户多天同一个host同种组操作类型时序关联
     # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
-    # activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta, host_activity)
+    activity_graph = rule_3(activity_graph, daily_sequences_list, day_delta, host_activity)
     # activity_graph = rule_3_1(activity_graph, daily_sequences_list, day_delta, host_activity)
 
     company_graph = construct_company_graph()
