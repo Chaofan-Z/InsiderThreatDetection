@@ -74,8 +74,11 @@ def rule_2(activity_graph, daily_sequences_list, day_delta, host_activity):
                     activity_graph.add_edge(st_i, st_j, EdgeType=2, weight=weight)
                     activity_graph.add_edge(ed_i, ed_j, EdgeType=2, weight=weight)
     
-    # del daily_sequences_list
-    # gc.collect()
+    print("start to delete daily_sequences_list")
+    st = time.time()
+    del daily_sequences_list
+    gc.collect()
+    print("Delete cost : ", time.time() - st)
     
     print("rule2 edge number : ", rule2_num)
     return activity_graph
@@ -84,7 +87,7 @@ def rule_2(activity_graph, daily_sequences_list, day_delta, host_activity):
 # （规则定义组操作类型，比如Connect-> disconnect, File open -> File Write, visit web...）
 # 每天的行为序列中，仅仅将同一个文件的File open -> File Write；Connect -> Disconnect 作为组操作类型连接
 @timer
-def rule_3(activity_graph, daily_sequences_list, day_delta, day_host_activity):
+def rule_3(activity_graph, day_host_activity):
     rule3_num = 0
     pattern = [["File Open", "File Write"], ["Connect", "Disconnect"]]
     pattern_list = list(chain.from_iterable(pattern))
@@ -122,8 +125,9 @@ def rule_3(activity_graph, daily_sequences_list, day_delta, day_host_activity):
 
     host_day_activity = {}
     host_day_activity_pattern = {}
+    print("Check pattern")
 
-    for i in range(len(day_host_activity)):
+    for i in tqdm(range(len(day_host_activity))):
         # print(day_host_activity[i])
         if day_host_activity[i] == None:
             continue
